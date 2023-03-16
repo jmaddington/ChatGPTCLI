@@ -146,25 +146,6 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     bot = chat = ChatGPT(max_tokens=args.max_tokens, temperature=args.temperature, frequency_penalty=args.frequency_penalty)
-
-    if args.better:
-        chat.metaBetter()
-        sys.exit()
         
-    elif args.last:
-        entries = chat.get_last_entries(history_file, args.last)
-        for entry in entries:
-            print(f"{entry[1]} - You: {entry[2]}\nChatGPT: {entry[3]}\n")
-        
-    elif args.code:
-        file = open(args.code, "r")
-        bot.FileContents = file.read()
-        file.close()
-        bot.RespondToCode()
-        
-    # elif args.prompt:
-    #     bot.StartChat()
-        
-    else:
-        print(f"\nYou can use ``` to enter code. End code block with ``` and still use two consecutive empty lines to exit.")
-        bot.StartChat()
+    print(f"\nYou can use ``` to enter code. End code block with ``` and still use two consecutive empty lines to exit.")
+    bot.StartChat()
