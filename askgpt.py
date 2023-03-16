@@ -157,7 +157,7 @@ class ChatGPT:
         response = self.chat(prompt)
         print (f"{response}")
                 
-    def AskForInput(self, hint = 'Ask me anything! (Enter two consecutive empty lines to exit)'):
+    def AskForInput(self, hint = 'Ask me anything! (Enter two consecutive empty lines to submit, quit or exit to exit)'):
         """
         Ask the user for input until two blank lines are entered.
         
