@@ -4,7 +4,7 @@ import sys
 import time
 import os
 import sqlite3
-from datetime import datetime
+import datetime
  
  # Read the API key from the environment variable
 openai.api_key = os.environ["OPENAI_API_KEY"]
@@ -14,6 +14,7 @@ class ChatGPT:
     LastPrompt = ""
     LastResponse = ""
     FileContents = ""
+    Chatname = ""
     
     def __init__(self, api_key = os.environ["OPENAI_API_KEY"], history_file = history_file, max_tokens=2048, temperature=0.9, frequency_penalty=0.0, stop=None):
         openai.api_key = api_key
@@ -23,7 +24,12 @@ class ChatGPT:
         self.temperature = temperature
         self.frequency_penalty = frequency_penalty
         self.stop = stop
-
+        
+        conn = sqlite3.connect(self.history_file)
+        c = conn.cursor()
+        c.execute("SELECT chatname FROM chat ORDER BY timestamp DESC LIMIT 1")
+        self.Chatname = c.fetchone()[0]
+        conn.close()
  
         # Create the chat history database if it doesn't exist
         if not os.path.exists(self.history_file):
@@ -59,18 +65,39 @@ class ChatGPT:
  
         return self.LastResponse
  
-    def save_chat(self, prompt, message):
+    def save_chat(self, prompt, message, chatname = ''):
+        
+        if chatname:
+            self.Chatname = chatname
+        
+        # Create a chat name if one isn't provided
+        if not self.Chatname:
+            self.ResetChat()
+            
         conn = sqlite3.connect(self.history_file)
         c = conn.cursor()
-        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        c.execute("INSERT INTO chat (timestamp, prompt, message) VALUES (?, ?, ?)", (timestamp, prompt, message))
+        timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        c.execute("INSERT INTO chat (chatname, timestamp, prompt, message) VALUES (?, ?, ?, ?)", (self.Chatname, timestamp, prompt, message))
         conn.commit()
         conn.close()
+        
+    def ResetChat(self, chatname = ''):
+        
+        if chatname:
+            self.Chatname = chatname
+        elif self.Chatname:
+
+            # Generate a chat name based on the current date, time, and user
+            now = datetime.datetime.now()
+            username = os.getlogin()
+            self.Chatname = f"chat_{now.strftime('%Y_%m_%d_%H_%M_%S')}_{username}.txt"
+            
+        return self.Chatname
  
     def _init_database(self):
         conn = sqlite3.connect(self.history_file)
         c = conn.cursor()
-        c.execute("CREATE TABLE IF NOT EXISTS chat (id INTEGER PRIMARY KEY AUTOINCREMENT, timestamp TEXT, prompt TEXT, message TEXT)")
+        c.execute("CREATE TABLE IF NOT EXISTS chat (id INTEGER PRIMARY KEY AUTOINCREMENT, chatname TEXT, timestamp TEXT, prompt TEXT, message TEXT)")
         conn.commit()
         conn.close()
  
@@ -78,19 +105,22 @@ class ChatGPT:
         conn = sqlite3.connect(self.history_file)
         conn.row_factory = sqlite3.Row
         c = conn.cursor()
-        c.execute("SELECT * FROM chat ORDER BY timestamp DESC LIMIT ?", (n,))
+        c.execute(f"SELECT * FROM chat WHERE  chatname = '{self.Chatname}' ORDER BY timestamp DESC LIMIT ?", (n,))
         entries = c.fetchall()
         conn.close()
         return entries
         
     def metaBetter(self):
-        prompt = input("How can we make this script better?\n")
+        prompt = self.AskForInput(hint="How do you want to improve the script?")
+        
         with open(sys.argv[0], "r") as file:
             script = file.read()
-        script += "\n\n" + prompt
-        response = self.chat(script)
+        prompt += "\n\n" + script
+        
+        response = self.chat(prompt)
         with open("better.py", "w") as file:
             file.write(response)
+            
         print(f"Better script written to better.py")
         
     def StartChat(self):
@@ -98,6 +128,22 @@ class ChatGPT:
             prompt = self.AskForInput()
             response = self.chat(prompt)
             print(f"{response}\n...\n")
+            
+            if "---output---" in response:
+                print(f"Output: {response.split('---output---')[1]}")
+                
+            self.save_chat(prompt, response)
+    
+    # The prompt for this is not currently returning expected values            
+    def parse_output(self, output = "", filename = 'output.txt'):
+        
+        output_lines = output.split("\n")
+        start_index = output_lines.index("---outputtowrite---") + 1
+        end_index = output_lines.index("---endoutput---")
+        output_to_write = "\n".join(output_lines[start_index:end_index])
+        with open("signature.vcf", "w") as f:
+            f.write(output_to_write)
+        return output_to_write
             
     def RespondToCode(self, hint = 'What do you want to do with the file??'):
         if not self.FileContents:
@@ -126,13 +172,30 @@ class ChatGPT:
             while len(user_inputs) < 2 or user_inputs[-2:] != ["", ""]:
                 user_input = input()
                 
+                if "metabetter" in user_input:
+                    self.metaBetter()
+                
                 if user_input == "```":
                     while user_input != "```":
                         user_input = input()
                         user_inputs.append(user_input)
                 
-                    if user_input == "exit" or user_input == "quit":
+                    if user_input.lower() == "exit" or user_input.lower() == "quit":
                         exit(0)
+                        
+                elif user_input == "write to file":
+                    user_inputs.append(f"Use the following lines to specify what the output written to a file should be\n---startoutput---\n---endoutput---\n\nwith the output between the start and end lines.")
+                    user_inputs.append(f"Return the filename that should be written to\n---startfilename---\n--endfilename---\n\nwith the filename between the start and end lines.")
+                    
+                elif "reset chat" in user_input.lower():
+                    if "name=" in user_input.lower():
+                        self.Chatname = user_input.split("=")[1].strip()
+                        NewName = self.ResetChat(chatname = self.Chatname)
+                    else:
+                        NewName = self.ResetChat()
+                        
+                    print(f'New chat started with name {NewName}. Previous inputs cleared')
+                    continue
                         
                 elif user_input == "exit" or user_input == "quit":
                     exit(0)
