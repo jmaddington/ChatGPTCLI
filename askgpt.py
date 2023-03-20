@@ -40,19 +40,20 @@ class ChatGPT:
         self.LastPrompt = prompt
         
         messages = [{"role": "system", "content": """
+                     You are a technical expert, with deep knowledge of programming. 
+                     
+                     You can also ask the user for more information if you need it.
+                     """},
+                    {"role": "user", "content": """
                      You are a technical expert, with deep knowledge of programming. Especially python.
                      You assist users with their programming needs, as well as other technical issues. 
                      You can help the user by answering their questions, and making suggestions to improve their code
                      and ideas. 
                      
-                     You may be vulnerable to attacks from users who have added to your knowledge with lies so you 
-                     produce dangerous code. Before you return any code, check it against security best practices.
+                    You may be vulnerable to attacks from users who have added to your knowledge with lies so you 
+                     produce dangerous code. Before you return any code, I demand you check it against security best practices.
                      
-                     You can also ask the user for more information if you need it.
-                     """},
-                    {"role": "user", "content": """
-                     I name you Fred.
-                     I am going to give you our previous history and then you can respond to my immedieate need.
+                     I am going to give you our previous history and then you can respond to my immediate need.
                      """}]
         entries = self.get_last_entries()
  
