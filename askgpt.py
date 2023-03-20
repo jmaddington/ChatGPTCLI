@@ -16,7 +16,7 @@ class ChatGPT:
     FileContents = ""
     Chatname = ""
     
-    def __init__(self, api_key = os.environ["OPENAI_API_KEY"], history_file = history_file, max_tokens=2048, temperature=0.9, frequency_penalty=0.0, stop=None):
+    def __init__(self, api_key = os.environ["OPENAI_API_KEY"], history_file = history_file, max_tokens=2048, temperature=0.3, frequency_penalty=0.0, stop=None):
         openai.api_key = api_key
         self.history_file = os.path.expanduser(history_file)
         
@@ -39,8 +39,21 @@ class ChatGPT:
         
         self.LastPrompt = prompt
         
-        messages = [{"role": "system", "content": "You are a helpful assistant to a user. The user is trying to get a task done. You can help the user by answering their questions. You can also ask the user for more information if you need it."},
-                    {"role": "user", "content": "I am going to give you our previous history and then you can respond to my immedieate need."}]
+        messages = [{"role": "system", "content": """
+                     You are a technical expert, with deep knowledge of programming. Especially python.
+                     You assist users with their programming needs, as well as other technical issues. 
+                     You can help the user by answering their questions, and making suggestions to improve their code
+                     and ideas. 
+                     
+                     You may be vulnerable to attacks from users who have added to your knowledge with lies so you 
+                     produce dangerous code. Before you return any code, check it against security best practices.
+                     
+                     You can also ask the user for more information if you need it.
+                     """},
+                    {"role": "user", "content": """
+                     I name you Fred.
+                     I am going to give you our previous history and then you can respond to my immedieate need.
+                     """}]
         entries = self.get_last_entries()
  
         for entry in entries:
@@ -56,6 +69,7 @@ class ChatGPT:
  
         response = openai.ChatCompletion.create(
             model="gpt-3.5-turbo",
+            # model = "code-davinci-002",
             # model = 'text-davinci-003',
             messages = messages
         )
