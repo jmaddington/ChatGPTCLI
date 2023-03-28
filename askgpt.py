@@ -69,9 +69,8 @@ class ChatGPT:
         print("...")
  
         response = openai.ChatCompletion.create(
-            model="gpt-3.5-turbo",
-            # model = "code-davinci-002",
-            # model = 'text-davinci-003',
+            # model="gpt-3.5-turbo-0301",
+            model = "gpt-4",
             messages = messages
         )
 
