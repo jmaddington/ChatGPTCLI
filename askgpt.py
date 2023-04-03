@@ -278,7 +278,10 @@ class ChatGPT:
   
                 elif user_input.startswith("/delete allchats"):
                     conn = sqlite3.connect(self.history_file)
+                    c = conn.cursor()
                     c.execute("DELETE FROM chat")
+                    conn.commit()
+                    conn.close()
                     self.printMessage(f'All chats deleted')
 
                     
