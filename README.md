@@ -38,6 +38,50 @@ __There are three things you need to know about input__
 - If you start code with \`\`\` then it will accept input until you enter \`\`\` and two blank lines
 - `exit` or `quit` will gracefully close the program
 
+### Rest the chat
+Sometimes GPT gets confused with too much background information. You can reset the
+chat by typing `reset chat`
+You can name your new chat with `reset chat=myName`, although that change only matters
+to the SQLite file.
+
+This effectively lets you switch between chats if you want as well.
+
+### ChatGPT version
+This script defaults to `gpt-4`. If you do not have access to it or would like to use another version
+edit this line as needed:
+```python
+    Model = "gpt-4"
+```
+
+The script will fall back to `gpt-3.5-turbo` if there is an API error:
+```python
+        response = None
+        try:
+            response = openai.ChatCompletion.create(
+                model = self.Model,
+                messages = messages
+            )
+        except openai.error.APIError as error:
+            # if there is an API error with message exceeded maximum allotted capacity, switch to gpt-3.5-turbo model
+            if error.status == 429 and model == 'gpt-4' :
+                self.printMessage("GPT 4 is unavailable, switching to GPT 3.5 Turbo", message_from="prompt")
+                self.chat(prompt, model = "gpt-3.5-turbo")
+            else:
+                # if it's another kind of error, raise the error
+                raise error
+```
+
+Edit `self.chat(prompt, model = "gpt-3.5-turbo")` as needed to create a fallback for yourself.
+Or, you can replace the entire section to to:
+
+```python
+    response = None
+        response = openai.ChatCompletion.create(
+            model = self.Model,
+            messages = messages
+        )
+```
+
 ## History
 Chat history is saved in a sqlite file in your home directory, this is required for the chat to work correctly.
 If history is not saved, then every message restarts the chat and ChatGPT doesn't have any context from previous 
