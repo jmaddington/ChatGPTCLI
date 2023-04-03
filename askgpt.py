@@ -259,9 +259,12 @@ class ChatGPT:
                         NewName = self.ResetChat(chatname = self.Chatname)
                     else:
                         NewName = self.ResetChat()
+                        self.printMessage(f'New chat started with name {NewName}')
+                        continue
                         
-                    self.printMessage(f'New chat started with name {NewName}. Previous inputs cleared')
-                    continue
+                elif "model=" in user_input.lower():
+                    self.Model = user_input.split("=")[1].strip()
+                    self.printMessage(f"Model changed to {self.Model}")
                         
                 elif user_input == "exit" or user_input == "quit":
                     exit(0)

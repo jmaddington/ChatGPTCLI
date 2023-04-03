@@ -46,7 +46,7 @@ to the SQLite file.
 
 This effectively lets you switch between chats if you want as well.
 
-### ChatGPT version
+### ChatGPT model
 This script defaults to `gpt-4`. If you do not have access to it or would like to use another version
 edit this line as needed:
 ```python
@@ -80,6 +80,12 @@ Or, you can replace the entire section to to:
             model = self.Model,
             messages = messages
         )
+```
+
+### Change models during chat
+You can change GPT models during you chat with:
+```python
+model=<your preferred model>
 ```
 
 ## History
