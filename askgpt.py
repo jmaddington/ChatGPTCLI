@@ -274,6 +274,17 @@ class ChatGPT:
                     for name in chat_names:
                         self.printMessage(name[0])
                         
+                elif user_input.startswith("/history"):
+                    conn = sqlite3.connect(self.history_file)
+                    entries = conn.execute(f"SELECT prompt, message, timestamp from chat WHERE chatname='{self.Chatname}' ORDER BY timestamp ASC").fetchall()
+                    
+                    for entry in entries:
+                        timestamp = entry[2]
+                        self.printMessage(f"You: {entry[0]} ({timestamp})", message_from="prompt")
+                        self.printMessage("")
+                        self.printMessage(f"GPT: {entry[1]} ({timestamp})", message_from="gpt")
+
+                        
                 elif user_input == "exit" or user_input == "quit":
                     exit(0)
                     
