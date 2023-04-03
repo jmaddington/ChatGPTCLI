@@ -82,7 +82,7 @@ class ChatGPT:
             )
         except openai.error.APIError as error:
             # if there is an API error with message exceeded maximum allotted capacity, switch to gpt-3.5-turbo model
-            if error.status == 429 and 'exceeded maximum allotted capacity' in error.message.lower() and model == 'gpt-4' :
+            if error.status == 429 and model == 'gpt-4' :
                 print("GPT 4 is unavailable, switching to GPT 3.5 Turbo")
                 self.chat(prompt, model = "gpt-3.5-turbo")
             else:
