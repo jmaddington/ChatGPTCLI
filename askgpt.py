@@ -69,8 +69,8 @@ class ChatGPT:
         print("...")
  
         response = openai.ChatCompletion.create(
-            # model="gpt-3.5-turbo-0301",
-            model = "gpt-4",
+            model="gpt-3.5-turbo",
+            # model = "gpt-4",
             messages = messages
         )
 
@@ -115,12 +115,38 @@ class ChatGPT:
         conn.commit()
         conn.close()
  
-    def get_last_entries(self, n=10):
+    def get_last_entries(self, min_words=2000):
         conn = sqlite3.connect(self.history_file)
         conn.row_factory = sqlite3.Row
         c = conn.cursor()
-        c.execute(f"SELECT * FROM chat WHERE  chatname = '{self.Chatname}' ORDER BY timestamp DESC LIMIT ?", (n,))
-        entries = c.fetchall()
+
+        entries = []
+        word_count = 0
+        offset = 0
+        batch_size = 5
+
+        while word_count < min_words:
+            c.execute(f"SELECT * FROM chat WHERE chatname = '{self.Chatname}' ORDER BY timestamp DESC LIMIT ? OFFSET ?", (batch_size, offset))
+            batch_entries = c.fetchall()
+
+            if not batch_entries:
+                break
+
+            for entry in batch_entries:
+                if word_count >= min_words:
+                    # if the word count exceeds min_words, stop adding new entries
+                    break
+                entries.append(entry)
+                word_count += len(entry['message'].split(' '))
+
+            offset += batch_size
+
+        # if the word count still exceeds min_words after adding all entries, drop oldest messages
+        while word_count > min_words:
+            entry = entries.pop(0)
+            messages = [entry['message'] for entry in entries]
+            word_count = len(messages.split(' '))
+
         conn.close()
         return entries
         
