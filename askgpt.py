@@ -238,7 +238,7 @@ class ChatGPT:
             while len(user_inputs) < 2 or user_inputs[-2:] != ["", ""]:
                 user_input = input()
                 
-                if "metabetter" in user_input:
+                if "/metabetter" in user_input:
                     self.metaBetter()
                 
                 if user_input == "```":
@@ -249,11 +249,11 @@ class ChatGPT:
                     if user_input.lower() == "exit" or user_input.lower() == "quit":
                         exit(0)
                         
-                elif user_input == "write to file":
+                elif user_input == "/write to file":
                     user_inputs.append(f"Use the following lines to specify what the output written to a file should be\n---startoutput---\n---endoutput---\n\nwith the output between the start and end lines.")
                     user_inputs.append(f"Return the filename that should be written to\n---startfilename---\n--endfilename---\n\nwith the filename between the start and end lines.")
                     
-                elif "reset chat" in user_input.lower():
+                elif "/reset chat" in user_input.lower():
                     if "name=" in user_input.lower():
                         self.Chatname = user_input.split("=")[1].strip()
                         NewName = self.ResetChat(chatname = self.Chatname)
@@ -262,9 +262,16 @@ class ChatGPT:
                         self.printMessage(f'New chat started with name {NewName}')
                         continue
                         
-                elif "model=" in user_input.lower():
+                elif "/model=" in user_input.lower():
                     self.Model = user_input.split("=")[1].strip()
                     self.printMessage(f"Model changed to {self.Model}")
+                    
+                elif "/list chats" in user_input.lower():
+                    conn = sqlite3.connect(self.history_file)
+                    chat_names = conn.execute("SELECT DISTINCT chatname FROM chat").fetchall()
+                    
+                    for name in chat_names:
+                        self.printMessage(name[0])
                         
                 elif user_input == "exit" or user_input == "quit":
                     exit(0)
