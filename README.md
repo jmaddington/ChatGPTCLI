@@ -38,10 +38,10 @@ __There are three things you need to know about input__
 - If you start code with \`\`\` then it will accept input until you enter \`\`\` and two blank lines
 - `exit` or `quit` will gracefully close the program
 
-### Rest the chat
+### Reset the chat
 Sometimes GPT gets confused with too much background information. You can reset the
-chat by typing `reset chat`
-You can name your new chat with `reset chat=myName`, although that change only matters
+chat by typing `/reset chat`
+You can name your new chat with `/reset chat myName test`, although that change only matters
 to the SQLite file.
 
 This effectively lets you switch between chats if you want as well.
@@ -85,7 +85,7 @@ Or, you can replace the entire section to to:
 ### Change models during chat
 You can change GPT models during you chat with:
 ```python
-model=<your preferred model>
+/model <your preferred model>
 ```
 
 ## History
