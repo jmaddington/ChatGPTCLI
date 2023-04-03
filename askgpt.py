@@ -188,20 +188,7 @@ class ChatGPT:
 
         conn.close()
         return entries
-        
-    def metaBetter(self):
-        prompt = self.AskForInput(hint="How do you want to improve the script?")
-        
-        with open(sys.argv[0], "r") as file:
-            script = file.read()
-        prompt += "\n\n" + script
-        
-        response = self.chat(prompt)
-        with open("better.py", "w") as file:
-            file.write(response)
-            
-        self.printMessage(f"Better script written to better.py", message_from="prompt")
-        
+
     def StartChat(self):
         while True:
             prompt = self.AskForInput()
@@ -324,24 +311,5 @@ if __name__ == '__main__':
 
     bot = chat = ChatGPT(max_tokens=args.max_tokens, temperature=args.temperature, frequency_penalty=args.frequency_penalty)
 
-    if args.better:
-        chat.metaBetter()
-        sys.exit()
-        
-    elif args.last:
-        entries = chat.get_last_entries(history_file, args.last)
-        for entry in entries:
-            print(f"{entry[1]} - You: {entry[2]}\nChatGPT: {entry[3]}\n")
-        
-    elif args.code:
-        file = open(args.code, "r")
-        bot.FileContents = file.read()
-        file.close()
-        bot.RespondToCode()
-        
-    # elif args.prompt:
-    #     bot.StartChat()
-        
-    else:
-        print(f"\nYou can use ``` to enter code. End code block with ``` and still use two consecutive empty lines to exit.")
-        bot.StartChat()
+    print(f"\nYou can use ``` to enter code. End code block with ``` and still use two consecutive empty lines to exit.")
+    bot.StartChat()
