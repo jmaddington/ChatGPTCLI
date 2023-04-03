@@ -253,18 +253,19 @@ class ChatGPT:
                     user_inputs.append(f"Use the following lines to specify what the output written to a file should be\n---startoutput---\n---endoutput---\n\nwith the output between the start and end lines.")
                     user_inputs.append(f"Return the filename that should be written to\n---startfilename---\n--endfilename---\n\nwith the filename between the start and end lines.")
                     
-                elif "/reset chat" in user_input.lower():
-                    if "name=" in user_input.lower():
-                        self.Chatname = user_input.split("=")[1].strip()
+                elif user_input.startswith("/reset chat"):
+                    name = user_input.replace("/reset chat", "").strip()
+                    if name:
+                        self.Chatname = name
                         NewName = self.ResetChat(chatname = self.Chatname)
                     else:
                         NewName = self.ResetChat()
-                        self.printMessage(f'New chat started with name {NewName}')
-                        continue
+                    self.printMessage(f'New chat started with name {NewName}')
+                    continue
                         
-                elif "/model=" in user_input.lower():
-                    self.Model = user_input.split("=")[1].strip()
-                    self.printMessage(f"Model changed to {self.Model}")
+                elif user_input.startswith("/model"):
+                    self.Model = user_input.split(" ")[1].strip()
+                    self.printMessage(f"Model changed to {self.Model}\n")
                     
                 elif "/list chats" in user_input.lower():
                     conn = sqlite3.connect(self.history_file)
