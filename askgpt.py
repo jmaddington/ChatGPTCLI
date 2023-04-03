@@ -267,7 +267,7 @@ class ChatGPT:
                     self.Model = user_input.split(" ")[1].strip()
                     self.printMessage(f"Model changed to {self.Model}\n")
                     
-                elif "/list chats" in user_input.lower():
+                elif user_input.startswith("/list chats"):
                     conn = sqlite3.connect(self.history_file)
                     chat_names = conn.execute("SELECT DISTINCT chatname FROM chat").fetchall()
                     
