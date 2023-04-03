@@ -5,6 +5,7 @@ import time
 import os
 import sqlite3
 import datetime
+from colorama import Fore, Style, init
  
  # Read the API key from the environment variable
 openai.api_key = os.environ["OPENAI_API_KEY"]
@@ -16,6 +17,8 @@ class ChatGPT:
     FileContents = ""
     Chatname = ""
     Model = "gpt-4"
+    PromptColor = Fore.WHITE
+    GPTColor = Fore.GREEN
     
     def __init__(self, api_key = os.environ["OPENAI_API_KEY"], history_file = history_file, max_tokens=2048, temperature=0.3, frequency_penalty=0.0, stop=None):
         openai.api_key = api_key
@@ -35,7 +38,24 @@ class ChatGPT:
         # Create the chat history database if it doesn't exist
         if not os.path.exists(self.history_file):
             self._init_database()
- 
+
+    def printMessage (self, message, message_from = "prompt"):
+        '''
+        Print a message to the console, with a color based on who the message is from.
+        
+        Falls back to default color if the colorama module is not available.
+        '''
+        if message_from == "prompt":
+            color = self.PromptColor
+            
+        if message_from == "gpt":
+            color = self.GPTColor
+            
+        try:    
+            print(f"{color}{message}{Style.RESET_ALL}")
+        except:
+            print(f"{message}")
+        
     def chat(self, prompt, model = ""):
         
         if model:
@@ -74,7 +94,7 @@ class ChatGPT:
             messages.append({"role": "system", "content": f"At {timestamp}: {message}"})
  
         messages.append({"role": "user", "content": prompt})
-        print("...")
+        self.printMessage("...",  message_from="prompt")
  
         response = None
         try:
@@ -85,7 +105,7 @@ class ChatGPT:
         except openai.error.APIError as error:
             # if there is an API error with message exceeded maximum allotted capacity, switch to gpt-3.5-turbo model
             if error.status == 429 and model == 'gpt-4' :
-                print("GPT 4 is unavailable, switching to GPT 3.5 Turbo")
+                self.printMessage("GPT 4 is unavailable, switching to GPT 3.5 Turbo", message_from="prompt")
                 self.chat(prompt, model = "gpt-3.5-turbo")
             else:
                 # if it's another kind of error, raise the error
@@ -179,16 +199,16 @@ class ChatGPT:
         with open("better.py", "w") as file:
             file.write(response)
             
-        print(f"Better script written to better.py")
+        self.printMessage(f"Better script written to better.py", message_from="prompt")
         
     def StartChat(self):
         while True:
             prompt = self.AskForInput()
             response = self.chat(prompt)
-            print(f"{response}\n...\n")
+            self.printMessage(f"{response}\n...\n", message_from="gpt")
             
             if "---output---" in response:
-                print(f"Output: {response.split('---output---')[1]}")
+                self.printMessage(f"Output: {response.split('---output---')[1]}", message_from="gpt")
                 
             self.save_chat(prompt, response)
     
@@ -205,7 +225,7 @@ class ChatGPT:
             
     def RespondToCode(self, hint = 'What do you want to do with the file??'):
         if not self.FileContents:
-            print("No file contents to respond to.")
+            self.printMessage("No file contents to respond to.")
             exit(1)
             
         prompt = self.AskForInput(hint)
@@ -213,7 +233,7 @@ class ChatGPT:
         prompt = f"{prompt}\n\n{self.FileContents}"
         
         response = self.chat(prompt)
-        print (f"{response}")
+        self.printMessage (f"{response}", message_from="gpt")
                 
     def AskForInput(self, hint = ""):
         """
@@ -227,7 +247,7 @@ class ChatGPT:
         
         while True:
             # Initialize an empty list to hold the user inputs
-            print(hint)
+            self.printMessage(hint)
             user_inputs = []
             
             # Keep accepting input until two consecutive empty lines are entered
@@ -256,7 +276,7 @@ class ChatGPT:
                     else:
                         NewName = self.ResetChat()
                         
-                    print(f'New chat started with name {NewName}. Previous inputs cleared')
+                    self.printMessage(f'New chat started with name {NewName}. Previous inputs cleared')
                     continue
                         
                 elif user_input == "exit" or user_input == "quit":
@@ -271,7 +291,7 @@ class ChatGPT:
             prompt = "\n".join(user_inputs)
             
             if not prompt.strip():
-                print("You didn't enter a prompt. Please try again.")
+                self.printMessage("You didn't enter a prompt. Please try again.")
             else:
                 return prompt
             
