@@ -38,7 +38,6 @@ class ChatGPT:
  
     def chat(self, prompt, model = ""):
         
-        self.LastPrompt = prompt
         if model:
             self.Model = model
         
@@ -94,6 +93,7 @@ class ChatGPT:
 
         message = response.choices[0].message.content
         self.LastResponse = message
+        self.LastPrompt = prompt
  
         return self.LastResponse
  
