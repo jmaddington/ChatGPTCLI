@@ -38,6 +38,11 @@ __There are three things you need to know about input__
 - If you start code with \`\`\` then it will accept input until you enter \`\`\` and two blank lines
 - `exit` or `quit` will gracefully close the program
 
+### Rest the chat
+Sometimes GPT gets confused with too much background information. You can reset the
+chat by typing `reset chat`
+You can name your new chat with `reset chat=myName`, although that change only matters
+to the SQLite file.
 ### ChatGPT version
 This script defaults to `gpt-4`. If you do not have access to it or would like to use another version
 edit this line as needed:
