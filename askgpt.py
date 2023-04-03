@@ -35,7 +35,7 @@ class ChatGPT:
         if not os.path.exists(self.history_file):
             self._init_database()
  
-    def chat(self, prompt):
+    def chat(self, prompt, model = "gpt-4"):
         
         self.LastPrompt = prompt
         
@@ -55,7 +55,13 @@ class ChatGPT:
                      
                      I am going to give you our previous history and then you can respond to my immediate need.
                      """}]
-        entries = self.get_last_entries()
+        
+        if model == "gpt-4":
+            word_count = 4000
+        else:
+            word_count = 2000
+            
+        entries = self.get_last_entries(min_words=word_count)
  
         for entry in entries:
             timestamp = entry['timestamp']
@@ -68,11 +74,20 @@ class ChatGPT:
         messages.append({"role": "user", "content": prompt})
         print("...")
  
-        response = openai.ChatCompletion.create(
-            model="gpt-3.5-turbo",
-            # model = "gpt-4",
-            messages = messages
-        )
+        response = None
+        try:
+            response = openai.ChatCompletion.create(
+                model = model,
+                messages = messages
+            )
+        except openai.error.APIError as error:
+            # if there is an API error with message exceeded maximum allotted capacity, switch to gpt-3.5-turbo model
+            if error.status == 429 and 'exceeded maximum allotted capacity' in error.message.lower() and model == 'gpt-4' :
+                print("GPT 4 is unavailable, switching to GPT 3.5 Turbo")
+                self.chat(prompt, model = "gpt-3.5-turbo")
+            else:
+                # if it's another kind of error, raise the error
+                raise error
 
         message = response.choices[0].message.content
         self.LastResponse = message
