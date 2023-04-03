@@ -262,7 +262,26 @@ class ChatGPT:
                         NewName = self.ResetChat()
                     self.printMessage(f'New chat started with name {NewName}')
                     continue
-                        
+                
+                elif user_input.startswith("/delete chat"):
+                    delete_name = user_input.replace("/delete chat", "").strip()
+                    if delete_name:
+                        conn = sqlite3.connect(self.history_file)
+                        c = conn.cursor()
+                        c.execute(f"DELETE FROM chat WHERE chatname='{delete_name}'")
+                        conn.commit()
+                        conn.close()
+                        self.printMessage(f"Chat {delete_name} deleted")
+                    else:
+                        NewName = self.ResetChat()
+                        self.printMessage(f'You must specify a chat name to delete. Your current chat name is {self.Chatname}')
+  
+                elif user_input.startswith("/delete allchats"):
+                    conn = sqlite3.connect(self.history_file)
+                    c.execute("DELETE FROM chat")
+                    self.printMessage(f'All chats deleted')
+
+                    
                 elif user_input.startswith("/model"):
                     self.Model = user_input.split(" ")[1].strip()
                     self.printMessage(f"Model changed to {self.Model}\n")

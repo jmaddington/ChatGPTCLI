@@ -51,6 +51,12 @@ This effectively lets you switch between chats if you want as well.
 This may include entries that are not sent to ChatGPT in the current context because
 they are over the token limit.
 
+### Delete a chat history
+```/delete chat <chatname>```
+
+### Delete all chats
+```/delete allchats```
+
 ### ChatGPT model
 This script defaults to `gpt-4`. If you do not have access to it or would like to use another version
 edit this line as needed:
