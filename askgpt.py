@@ -15,6 +15,7 @@ class ChatGPT:
     LastResponse = ""
     FileContents = ""
     Chatname = ""
+    Model = "gpt-4"
     
     def __init__(self, api_key = os.environ["OPENAI_API_KEY"], history_file = history_file, max_tokens=2048, temperature=0.3, frequency_penalty=0.0, stop=None):
         openai.api_key = api_key
@@ -35,9 +36,11 @@ class ChatGPT:
         if not os.path.exists(self.history_file):
             self._init_database()
  
-    def chat(self, prompt, model = "gpt-4"):
+    def chat(self, prompt, model = ""):
         
         self.LastPrompt = prompt
+        if model:
+            self.Model = model
         
         messages = [{"role": "system", "content": """
                      You are a technical expert, with deep knowledge of programming. 
@@ -77,7 +80,7 @@ class ChatGPT:
         response = None
         try:
             response = openai.ChatCompletion.create(
-                model = model,
+                model = self.Model,
                 messages = messages
             )
         except openai.error.APIError as error:
@@ -212,12 +215,16 @@ class ChatGPT:
         response = self.chat(prompt)
         print (f"{response}")
                 
-    def AskForInput(self, hint = 'Ask me anything! (Enter two consecutive empty lines to submit, quit or exit to exit)'):
+    def AskForInput(self, hint = ""):
         """
         Ask the user for input until two blank lines are entered.
         
         :return: The user input as a single string
         """
+        
+        if not hint:
+            hint = f'Ask me anything! (Enter two consecutive empty lines to submit, quit or exit to exit). You are using ChatGPT {self.Model}'
+        
         while True:
             # Initialize an empty list to hold the user inputs
             print(hint)
