@@ -143,7 +143,7 @@ class ChatGPT:
             # Generate a chat name based on the current date, time, and user
             now = datetime.datetime.now()
             username = os.getlogin()
-            self.Chatname = f"chat_{now.strftime('%Y_%m_%d_%H_%M_%S')}_{username}.txt"
+            self.Chatname = f"chat_{now.strftime('%Y_%m_%d_%H_%M_%S')}_{username}"
             
         return self.Chatname
  
@@ -188,7 +188,7 @@ class ChatGPT:
 
         conn.close()
         return entries
-        
+
     def StartChat(self):
         while True:
             prompt = self.AskForInput()
@@ -340,6 +340,6 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     bot = chat = ChatGPT(max_tokens=args.max_tokens, temperature=args.temperature, frequency_penalty=args.frequency_penalty)
-        
+
     print(f"\nYou can use ``` to enter code. End code block with ``` and still use two consecutive empty lines to exit.")
     bot.StartChat()
