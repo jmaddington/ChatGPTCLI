@@ -6,6 +6,7 @@ import os
 import sqlite3
 import datetime
 from colorama import Fore, Style, init
+from halo import Halo
  
  # Read the API key from the environment variable
 openai.api_key = os.environ["OPENAI_API_KEY"]
@@ -82,7 +83,7 @@ class ChatGPT:
             word_count = 4000
         else:
             word_count = 2000
-            
+        
         entries = self.get_last_entries(min_words=word_count)
  
         for entry in entries:
@@ -110,7 +111,7 @@ class ChatGPT:
             else:
                 # if it's another kind of error, raise the error
                 raise error
-
+        
         message = response.choices[0].message.content
         self.LastResponse = message
         self.LastPrompt = prompt
@@ -181,9 +182,9 @@ class ChatGPT:
 
         # if the word count still exceeds min_words after adding all entries, drop oldest messages
         while word_count > min_words:
-            entry = entries.pop(0)
-            messages = [entry['message'] for entry in entries]
-            word_count = len(messages.split(' '))
+            entry = entries[0]['message']
+            entries.pop(0)
+            word_count -= len(entry.split(' '))
 
         conn.close()
         return entries
@@ -204,7 +205,14 @@ class ChatGPT:
     def StartChat(self):
         while True:
             prompt = self.AskForInput()
-            response = self.chat(prompt)
+            
+
+            try:                
+                with Halo(text='GPT is thinking.', spinner='dots'):
+                    response = self.chat(prompt)
+            except:
+                response = self.chat(prompt)
+                
             self.printMessage(f"{response}\n...\n", message_from="gpt")
             
             if "---output---" in response:
@@ -243,7 +251,7 @@ class ChatGPT:
         """
         
         if not hint:
-            hint = f'Ask me anything! (Enter two consecutive empty lines to submit, quit or exit to exit). You are using ChatGPT {self.Model}'
+            hint = f'Ask me anything! (Enter two consecutive empty lines to submit, quit or exit to exit). You are using ChatGPT {self.Model} \n'
         
         while True:
             # Initialize an empty list to hold the user inputs
