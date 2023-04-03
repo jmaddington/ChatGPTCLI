@@ -143,7 +143,7 @@ class ChatGPT:
             # Generate a chat name based on the current date, time, and user
             now = datetime.datetime.now()
             username = os.getlogin()
-            self.Chatname = f"chat_{now.strftime('%Y_%m_%d_%H_%M_%S')}_{username}.txt"
+            self.Chatname = f"chat_{now.strftime('%Y_%m_%d_%H_%M_%S')}_{username}"
             
         return self.Chatname
  
