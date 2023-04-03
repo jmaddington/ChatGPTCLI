@@ -218,17 +218,6 @@ class ChatGPT:
             f.write(output_to_write)
         return output_to_write
             
-    def RespondToCode(self, hint = 'What do you want to do with the file??'):
-        if not self.FileContents:
-            self.printMessage("No file contents to respond to.")
-            exit(1)
-            
-        prompt = self.AskForInput(hint)
-        
-        prompt = f"{prompt}\n\n{self.FileContents}"
-        
-        response = self.chat(prompt)
-        self.printMessage (f"{response}", message_from="gpt")
                 
     def AskForInput(self, hint = ""):
         """
@@ -296,17 +285,14 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Interact with the OpenAI GPT-3 API')
     # parser.add_argument('-p', '--prompt', type=str, help='The prompt to provide to the API')
     parser.add_argument('-s', '--stop', type=str, default=None, help='The stop sequence for the API to use')
-    parser.add_argument('--code', type=str, help='Read the file as code, then ask what to do with it.')
 
     # Add extra arguments
     parser.add_argument('--max_tokens', type=int, help='The maximum number of tokens to generate in the chat response', default=3000)
-
     parser.add_argument('--temperature', type=float, default=.7,
                                 help='The softmax temperature to use for the API response')
     parser.add_argument('--frequency_penalty', type=float, default=0,
                                 help='The frequency penalty to use for the API response')
     parser.add_argument('--last', '-l', type=int, help='Retrieve last N entries from chat history', default=None)
-    parser.add_argument('--better', '-b', action='store_true', help='Use GPT to improve the script')
     args = parser.parse_args()
 
     bot = chat = ChatGPT(max_tokens=args.max_tokens, temperature=args.temperature, frequency_penalty=args.frequency_penalty)
