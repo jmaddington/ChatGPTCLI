@@ -58,10 +58,22 @@ class ChatGPT:
             print(f"{message}")
         
     def chat(self, prompt, model = ""):
+        """
+        Main function to chat with GPT. You may need to edit the lines under the message to customize how you want ChatGPT
+        to respond. The default is to tell ChatGPT it is a Python expert. Obviously, you can change that to whatever you want.
+        
+        :param prompt: The prompt to send to GPT
+        :type prompt: str
+        
+        :param model: The model to use. Defaults to gpt-4
+        :type model: str
+        """
         
         if model:
             self.Model = model
         
+        # Tell ChatGPT it is a Python expert
+        # It also lets GPT know that we will give it a history of previous conversations
         messages = [{"role": "system", "content": """
                      You are a technical expert, with deep knowledge of programming. 
                      
@@ -79,13 +91,19 @@ class ChatGPT:
                      I am going to give you our previous history and then you can respond to my immediate need.
                      """}]
         
+        # Customize the number of words to use for the history based on the model
+        # GPT-4 can handle more words than GPT-3, twice the number of tokens on the base model (8k), up to 32k tokens
+        # If you have a gpt-4 model that can take more tokens, modify the word_count here
+        # TODO: consider moving this to the class constructor
         if model == "gpt-4":
             word_count = 4000
         else:
             word_count = 2000
         
+        # Get previous history from the database
         entries = self.get_last_entries(min_words=word_count)
  
+        # ChatGPT needs the entries broken out by prompts and responses
         for entry in entries:
             timestamp = entry['timestamp']
             historical_prompt = entry['prompt']
@@ -97,6 +115,8 @@ class ChatGPT:
         messages.append({"role": "user", "content": prompt})
         self.printMessage("...",  message_from="prompt")
  
+        # Send the prompt to GPT
+        # Basic error checking, primarily to catch when GPT-4 is overloaded and switch to GPT-3.5 Turbo
         response = None
         try:
             response = openai.ChatCompletion.create(
@@ -112,6 +132,9 @@ class ChatGPT:
                 # if it's another kind of error, raise the error
                 raise error
         
+        # Grab the first message from the response.
+        # GPT can return more than one message, but we only want the first one. This script only requests a single response.
+        # See OpenAI docs for more info on multiple responses
         message = response.choices[0].message.content
         self.LastResponse = message
         self.LastPrompt = prompt
@@ -119,6 +142,18 @@ class ChatGPT:
         return self.LastResponse
  
     def save_chat(self, prompt, message, chatname = ''):
+        """
+        Save the chat history to a database.
+        
+        :param prompt: The prompt to sent to GPT
+        :type prompt: str
+        
+        :param message: The response from GPT
+        :type message: str
+        
+        :param chatname: The name of the chat. If not provided, a chat name will be generated
+        :type chatname: str
+        """
         
         if chatname:
             self.Chatname = chatname
