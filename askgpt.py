@@ -77,7 +77,7 @@ class ChatGPT:
         except:
             print(f"{message}\n")
         
-    def chat(self, prompt, model = "", check_bing = False):
+    def chat(self, prompt, model = "", check_bing = False, attempts = 0, max_retries = 3, backoff_time = 15):
         """
         Main function to chat with GPT. You may need to edit the lines under the message to customize how you want ChatGPT
         to respond. The default is to tell ChatGPT it is a Python expert. Obviously, you can change that to whatever you want.
@@ -146,11 +146,19 @@ class ChatGPT:
         except openai.error.APIError as error:
             # if there is an API error with message exceeded maximum allotted capacity, switch to gpt-3.5-turbo model
             if error.status == 429 and model == 'gpt-4' :
-                self.printMessage("GPT 4 is unavailable, switching to GPT 3.5 Turbo", message_from="prompt")
-                self.chat(prompt, model = "gpt-3.5-turbo")
-            else:
-                # if it's another kind of error, raise the error
-                raise error
+                self.printMessage("GPT 4 is unavailable, switching to GPT 3.5 Turbo", message_from="error")
+                response = self.chat(prompt, model = "gpt-3.5-turbo")
+        
+        # if there is a rate limit error, wait and try again        
+        except openai.error.RateLimitError as error:
+            self.printMessage("Rate limit exceeded, waiting 15 seconds and trying again", message_from="error")
+            if attempts < max_retries - 1:
+                attempts += 1
+                time.sleep(backoff_time * attempts)
+                response = self.chat(prompt, model = model, check_bing = check_bing, attempts = attempts, max_retries=max_retries, backoff_time = backoff_time)
+        except Exception as error:
+            # if it's another kind of error, raise the error
+            raise error
         
         # Grab the first message from the response.
         # GPT can return more than one message, but we only want the first one. This script only requests a single response.
@@ -162,7 +170,7 @@ class ChatGPT:
  
         return self.LastResponse
  
-    def query_chat_gpt(self, prompt = "", model = ""):
+    def query_chat_gpt(self, prompt, model = "", attempts = 0, max_retries = 3, backoff_time = 15):
         
         if not model:
             model = self.Model
@@ -173,16 +181,24 @@ class ChatGPT:
         try:
             response = openai.ChatCompletion.create(
                 model = self.Model,
-                messages =  [{"role": "user", "content": prompt}]
+                messages = messages
             )
         except openai.error.APIError as error:
             # if there is an API error with message exceeded maximum allotted capacity, switch to gpt-3.5-turbo model
             if error.status == 429 and model == 'gpt-4' :
                 self.printMessage("GPT 4 is unavailable, switching to GPT 3.5 Turbo", message_from="prompt")
-                self.query_chat_gpt(prompt, model = "gpt-3.5-turbo")
-            else:
-                # if it's another kind of error, raise the error
-                raise error
+                response = self.query_chat_gpt(prompt, model = "gpt-3.5-turbo", attempts = attempts, max_retries=max_retries, backoff_time=backoff_time)
+        
+        # if there is a rate limit error, wait and try again        
+        except openai.error.RateLimitError:
+            self.printMessage("Rate limit exceeded, waiting 15 seconds and trying again", message_from="error")
+            if attempts < max_retries - 1:
+                attempts += 1
+                time.sleep(backoff_time * attempts)
+                response = self.query_chat_gpt(prompt, model = model, attempts = attempts, max_retries=max_retries, backoff_time=backoff_time)
+        except Exception as error:
+            # if it's another kind of error, raise the error
+            raise error 
         
         # Grab the first message from the response.
         # GPT can return more than one message, but we only want the first one. This script only requests a single response.
@@ -355,67 +371,99 @@ class ChatGPT:
         while bing_results == None or bing_results == "":
             
             if not attempted_prompts:    
-                bing_prompt = f"I just asked you {prompt} and you said {response}. \n I'm going to do a Bing search to double check that, please turn your response into an appropriate search query."
+                bing_prompt = f"""
+                I just asked you {prompt} and you said {response}. \n 
+                I'm going to do a Bing search to double check that.
+                First, review the response and pull out any facts that you think are important. \n
+                Second, compose a search query that you think will find a fact check for the response. \n
+                Third, remove and quotes from the query \n
+                Fourth, output the query as a string, one query per line. \n
+                Do not output any other text. \n
+                \n
+                
+                """
                 
             else:
-                
-                bing_prompt = f"I just asked you {prompt} and you said {response}. \n I'm going to do a Bing search to double check that, please turn your response into an appropriate search query. \n I tried the following search queries and they did not work: {attempted_prompts}"
-                
-            bing_query = self.query_chat_gpt(prompt = bing_prompt, model = "gpt-3.5-turbo")
-                
+                bing_prompt = f"""
+                I just asked you {prompt} and you said {response}. \n 
+                I'm going to do a Bing search to double check that.
+                First, review the response and pull out any facts that you think are important. \n
+                Second, compose a search query that you think will find a fact check for the response. \n
+                Third, remove and quotes from the query \n
+                Fourth, output the query as a string, one query per line. \n
+                Do not output any other text. \n
+                I tried the following search queries and they did not work: {attempted_prompts}
+                \n
+                """
+            
+            fact_check_queries = self.query_chat_gpt(prompt = bing_prompt, model = "gpt-3.5-turbo")
+            
             if self.DEBUG:
-                self.printMessage(f"Bing query: {bing_query}", message_from="debug")
+                self.printMessage(f"Fact check queries: {fact_check_queries.splitlines()}", message_from="debug")
             
-            bing_results = self.search_bing(bing_query)
             
-            if not bing_results:
-                attempted_prompts.append(bing_prompt)
+            summary = ""
+            for fact_check_query in fact_check_queries.splitlines():
+                
+                if self.DEBUG:
+                    self.printMessage(f"Bing query: {fact_check_query}", message_from="debug")
+            
+                bing_results = self.search_bing(fact_check_query)
+                
+                if not bing_results:
+                    attempted_prompts.append(bing_prompt)
 
-        
-        summary = ""
-        num_result = 1
-        
-        for result in bing_results:
-            if num_result <= self.NumFactchecks:
-                if self.DEBUG:
-                    self.printMessage(f"Fact checking result {num_result}: {result}", message_from="debug")
-                    
-                result_information = self.extract_relevant_text(result)
-            
-                if self.DEBUG:
-                    self.printMessage(f"Result information: {result_information} \n \n", message_from="debug")
-            
-                response_words = result_information.split(" ")
-                word_count = len(response_words)
+                num_result = 1
                 
-                if self.DEBUG:
-                    self.printMessage(f"Word count: {word_count}", message_from="debug")
-                
-                # This section breaks up the response into 2000 word chunks, and then summarizes each chunk
-                # This is necessary because GPT-3 has a token limit of 4096, or roughly 3000 words. That includes both the prompt and the response
-                # You can change the 2000 to a lower number if you want to summarize more frequently, but it will take longer
-                # Or change it to a higher number when we have a model that accepts more tokens
-                if word_count > 2000:
-                    while word_count > 2000:
+                for result in bing_results:
+                    if num_result <= self.NumFactchecks:
                         if self.DEBUG:
-                            self.printMessage(f"Word count was too high, splitting up, the section we are summarizing is: {response_words[:2000]}", message_from="debug")
-                        
-                        split_information = response_words[:2000]
-                        response_words = response_words[2000:]
-                        
-                        summarize_prompt = f"We just ran a bing search, and this is what the first search item had in it: {split_information} \n Please summarize the information in the result. Keep all the information, but make it shorter, except code blocks."
-                        summary_response = self.query_chat_gpt(summarize_prompt, model = "gpt-3.5-turbo")
+                            self.printMessage(f"Fact checking result {num_result}: {result}", message_from="debug")
+                            
+                        result_information = self.extract_relevant_text(result)
+                    
+                        if self.DEBUG:
+                            self.printMessage(f"Result information: {result_information} \n \n", message_from="debug")
+                    
+                        response_words = result_information.split(" ")
                         word_count = len(response_words)
-                else:   
-                    summarize_prompt = f"We just ran a bing search, and this is what the first search item had in it: {result_information} \n Please summarize the information in the result. Keep all the information, but make it shorter, except code blocks."
-                    summary_response = self.query_chat_gpt(summarize_prompt, model = "gpt-3.5-turbo")
-                
-                if self.DEBUG:
-                    self.printMessage(f"Summary response from ChatGPT: {summary_response}", message_from="debug")
-                
-                summary = summary + f"\n {summary_response}"
-                
-                num_result += 1
+                        
+                        if self.DEBUG:
+                            self.printMessage(f"Word count: {word_count}", message_from="debug")
+                        
+                        # This section breaks up the response into 2000 word chunks, and then summarizes each chunk
+                        # This is necessary because GPT-3 has a token limit of 4096, or roughly 3000 words. That includes both the prompt and the response
+                        # You can change the 2000 to a lower number if you want to summarize more frequently, but it will take longer
+                        # Or change it to a higher number when we have a model that accepts more tokens
+                        if word_count > 2000:
+                            while word_count > 2000:
+                                if self.DEBUG:
+                                    self.printMessage(f"Word count was too high, splitting up, the section we are summarizing is: {response_words[:2000]}", message_from="debug")
+                                
+                                split_information = response_words[:2000]
+                                response_words = response_words[2000:]
+                                
+                                summarize_prompt = f"We just ran a bing search, and this is what the first search item had in it: {split_information} \n Please summarize the information in the result. Keep all the information, but make it shorter, except code blocks."
+                                summary_response = self.query_chat_gpt(summarize_prompt, model = "gpt-3.5-turbo")
+                                word_count = len(response_words)
+                        else:   
+                            summarize_prompt = f"We just ran a bing search, and this is what the first search item had in it: {result_information} \n Please summarize the information in the result. Keep all the information, but make it shorter, except code blocks."
+                            summary_response = self.query_chat_gpt(summarize_prompt, model = "gpt-3.5-turbo")
+                        
+                        if self.DEBUG:
+                            self.printMessage(f"Summary response from ChatGPT: {summary_response}", message_from="debug")
+                        
+                        # Check if the summary is relevant to the response
+                        # Bing search results are often not al,ways relevant to the response, so we want to make sure that the summary is relevant
+                        # For instance, when asking for an essay on the events of 1776 in the United States Bing may return results from Brexit, based on the
+                        # search query ChatGPT generated. (This is a real example)
+                        relevant_prompt = f"I decided to fact check your last response with a bing search. Your response was {response} \n\n Here is the summary of the result: {summary_response} \n Is this relevant to the response? If so, please say 'yes'. If not, please say 'no'. Do not say anything else."
+                        relevant_response = self.query_chat_gpt(relevant_prompt, model = "gpt-3.5-turbo")
+                        
+                        if "yes" in relevant_response.lower():
+                            summary = summary + f"\n {summary_response}"
+                        
+                        num_result += 1
         
         if self.DEBUG:
             self.printMessage(f"Summary: {summary}", message_from="debug")
