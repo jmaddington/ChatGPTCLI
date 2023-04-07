@@ -480,19 +480,6 @@ class ChatGPT:
         else:
             self.save_chat(fact_check_prompt, fact_check_response)
             return fact_check_response
-            
-    
-    # The prompt for this is not currently returning expected values            
-    def parse_output(self, output = "", filename = 'output.txt'):
-        
-        output_lines = output.split("\n")
-        start_index = output_lines.index("---outputtowrite---") + 1
-        end_index = output_lines.index("---endoutput---")
-        output_to_write = "\n".join(output_lines[start_index:end_index])
-        with open("signature.vcf", "w") as f:
-            f.write(output_to_write)
-        return output_to_write
-            
                 
     def AskForInput(self, hint = ""):
         """
@@ -524,10 +511,6 @@ class ChatGPT:
                     if user_input.lower() == "exit" or user_input.lower() == "quit":
                         exit(0)
                         
-                elif user_input == "/write to file":
-                    user_inputs.append(f"Use the following lines to specify what the output written to a file should be\n---startoutput---\n---endoutput---\n\nwith the output between the start and end lines.")
-                    user_inputs.append(f"Return the filename that should be written to\n---startfilename---\n--endfilename---\n\nwith the filename between the start and end lines.")
-                    
                 elif user_input.startswith("/reset chat"):
                     name = user_input.replace("/reset chat", "").strip()
                     if name:
