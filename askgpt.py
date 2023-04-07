@@ -9,6 +9,7 @@ from colorama import Fore, Style, init
 from halo import Halo
 import requests
 from bs4 import BeautifulSoup
+from retry import retry
  
  # Read the API key from the environment variable
 openai.api_key = os.environ["OPENAI_API_KEY"]
@@ -76,7 +77,8 @@ class ChatGPT:
             print(f"{color}{message}\n{Style.RESET_ALL}")
         except:
             print(f"{message}\n")
-        
+            
+    @retry(openai.error.RateLimitError, tries=3, delay=15, jitter=(1, 3))    
     def chat(self, prompt, model = "", check_bing = False, attempts = 0, max_retries = 3, backoff_time = 15):
         """
         Main function to chat with GPT. You may need to edit the lines under the message to customize how you want ChatGPT
@@ -89,8 +91,8 @@ class ChatGPT:
         :type model: str
         """
         
-        if model:
-            self.Model = model
+        if not model:
+            model = self.Model
         
         # Tell ChatGPT it is a Python expert
         # It also lets GPT know that we will give it a history of previous conversations
@@ -148,14 +150,7 @@ class ChatGPT:
             if error.status == 429 and model == 'gpt-4' :
                 self.printMessage("GPT 4 is unavailable, switching to GPT 3.5 Turbo", message_from="error")
                 response = self.chat(prompt, model = "gpt-3.5-turbo")
-        
-        # if there is a rate limit error, wait and try again        
-        except openai.error.RateLimitError as error:
-            self.printMessage("Rate limit exceeded, waiting 15 seconds and trying again", message_from="error")
-            if attempts < max_retries - 1:
-                attempts += 1
-                time.sleep(backoff_time * attempts)
-                response = self.chat(prompt, model = model, check_bing = check_bing, attempts = attempts, max_retries=max_retries, backoff_time = backoff_time)
+
         except Exception as error:
             # if it's another kind of error, raise the error
             raise error
@@ -169,8 +164,9 @@ class ChatGPT:
         self.LastPrompt = prompt
  
         return self.LastResponse
- 
-    def query_chat_gpt(self, prompt, model = "", attempts = 0, max_retries = 3, backoff_time = 15):
+    
+    @retry(openai.error.RateLimitError, tries=3, delay=15, jitter=(1, 3))    
+    def query_chat_gpt(self, prompt, model = ""):
         
         if not model:
             model = self.Model
@@ -187,15 +183,8 @@ class ChatGPT:
             # if there is an API error with message exceeded maximum allotted capacity, switch to gpt-3.5-turbo model
             if error.status == 429 and model == 'gpt-4' :
                 self.printMessage("GPT 4 is unavailable, switching to GPT 3.5 Turbo", message_from="prompt")
-                response = self.query_chat_gpt(prompt, model = "gpt-3.5-turbo", attempts = attempts, max_retries=max_retries, backoff_time=backoff_time)
-        
-        # if there is a rate limit error, wait and try again        
-        except openai.error.RateLimitError:
-            self.printMessage("Rate limit exceeded, waiting 15 seconds and trying again", message_from="error")
-            if attempts < max_retries - 1:
-                attempts += 1
-                time.sleep(backoff_time * attempts)
-                response = self.query_chat_gpt(prompt, model = model, attempts = attempts, max_retries=max_retries, backoff_time=backoff_time)
+                response = self.query_chat_gpt(prompt, model = "gpt-3.5-turbo")
+    
         except Exception as error:
             # if it's another kind of error, raise the error
             raise error 
