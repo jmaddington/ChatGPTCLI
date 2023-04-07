@@ -73,9 +73,9 @@ class ChatGPT:
             color = self.DebugColor
             
         try:    
-            print(f"{color}{message}{Style.RESET_ALL}")
+            print(f"{color}{message}\n{Style.RESET_ALL}")
         except:
-            print(f"{message}")
+            print(f"{message}\n")
         
     def chat(self, prompt, model = "", check_bing = False):
         """
@@ -308,6 +308,9 @@ class ChatGPT:
 
     def StartChat(self):
         while True:
+            fact_check_response = ""
+            response = ""
+            prompt = ""
             prompt = self.AskForInput()
             
 
@@ -322,20 +325,22 @@ class ChatGPT:
             if self.FactCheck:
                 if self.BingKey == "":
                     self.printMessage("You need to provide a Bing API key to use fact checking", message_from="error")
+                    self.printMessage(response, message_from="gpt")
+                    self.FactCheck = False
+                    continue
+              
+                with Halo(text='GPT is fact checking.', spinner='dots'):
+                    fact_check_response = self.fact_check(prompt, response)
+
+                    if fact_check_response == response:                
+                        self.printMessage(response, message_from="gpt")
+                        
+                    else:
+                        self.printMessage(fact_check_response, message_from="gpt")
+                        self.save_chat(f"After running a fact check a better response was {fact_check_response}", "Thank you, I will remember that")
                     
-                else:
-                    try:                
-                        with Halo(text='GPT is fact checking.', spinner='dots'):
-                            fact_check_response = self.fact_check(prompt, response)
-                    except:
-                        fact_check_response = self.fact_check(prompt, response)
-            
-            if fact_check_response == response:                
-                self.printMessage(response, message_from="gpt")
-                
             else:
-                self.printMessage(fact_check_response, message_from="gpt")
-                self.save_chat(f"After running a fact check a better response was {fact_check_response}", "Thank you, I will remember that")
+                self.printMessage(response, message_from="gpt")
             
             if "---output---" in response:
                 self.printMessage(f"Output: {response.split('---output---')[1]}", message_from="gpt")
@@ -345,88 +350,88 @@ class ChatGPT:
         if self.DEBUG:
             self.printMessage("We got an initial response from GPT, will now check it against Bing", message_from="debug")
             
-            attempted_prompts = []
-            bing_results = None
-            while bing_results == None or bing_results == "":
-                
-                if not attempted_prompts:    
-                    bing_prompt = f"I just asked you {prompt} and you said {response}. \n I'm going to do a Bing search to double check that, please turn your response into an appropriate search query."
-                    
-                else:
-                    
-                    bing_prompt = f"I just asked you {prompt} and you said {response}. \n I'm going to do a Bing search to double check that, please turn your response into an appropriate search query. \n I tried the following search queries and they did not work: {attempted_prompts}"
-                    
-                bing_query = self.query_chat_gpt(prompt = bing_prompt, model = "gpt-3.5-turbo")
-                    
-                if self.DEBUG:
-                    self.printMessage(f"Bing query: {bing_query}", message_from="debug")
-                
-                bing_results = self.search_bing(bing_query)
-                
-                if not bing_results:
-                    attempted_prompts.append(bing_prompt)
-
+        attempted_prompts = []
+        bing_results = None
+        while bing_results == None or bing_results == "":
             
-            summary = ""
-            num_result = 1
-            
-            for result in bing_results:
-                if num_result <= self.NumFactchecks:
-                    if self.DEBUG:
-                        self.printMessage(f"Fact checking result {num_result}: {result}", message_from="debug")
-                        
-                    result_information = self.extract_relevant_text(result)
-                
-                    if self.DEBUG:
-                        self.printMessage(f"Result information: {result_information} \n \n", message_from="debug")
-                
-                    response_words = result_information.split(" ")
-                    word_count = len(response_words)
-                    
-                    if self.DEBUG:
-                        self.printMessage(f"Word count: {word_count}", message_from="debug")
-                    
-                    # This section breaks up the response into 2000 word chunks, and then summarizes each chunk
-                    # This is necessary because GPT-3 has a token limit of 4096, or roughly 3000 words. That includes both the prompt and the response
-                    # You can change the 2000 to a lower number if you want to summarize more frequently, but it will take longer
-                    # Or change it to a higher number when we have a model that accepts more tokens
-                    if word_count > 2000:
-                        while word_count > 2000:
-                            if self.DEBUG:
-                                self.printMessage(f"Word count was too high, splitting up, the section we are summarizing is: {response_words[:2000]}", message_from="debug")
-                            
-                            split_information = response_words[:2000]
-                            response_words = response_words[2000:]
-                            
-                            summarize_prompt = f"We just ran a bing search, and this is what the first search item had in it: {split_information} \n Please summarize the information in the result. Keep all the information, but make it shorter, except code blocks."
-                            summary_response = self.query_chat_gpt(summarize_prompt, model = "gpt-3.5-turbo")
-                            word_count = len(response_words)
-                    else:   
-                        summarize_prompt = f"We just ran a bing search, and this is what the first search item had in it: {result_information} \n Please summarize the information in the result. Keep all the information, but make it shorter, except code blocks."
-                        summary_response = self.query_chat_gpt(summarize_prompt, model = "gpt-3.5-turbo")
-                    
-                    if self.DEBUG:
-                        self.printMessage(f"Summary response from ChatGPT: {summary_response}", message_from="debug")
-                    
-                    summary = summary + f"\n {summary_response}"
-                    
-                    num_result += 1
-            
-            if self.DEBUG:
-                self.printMessage(f"Summary: {summary}", message_from="debug")
-            
-            fact_check_prompt = f"I did a Bing search to double check that, here are the results: {summary} \n update your last response, but only if it matters. If it doesn't matter, just say 'no changes'."
-            fact_check_response = self.chat(fact_check_prompt)
-            
-            if self.DEBUG:
-                self.printMessage(f"Fact checked response: {fact_check_response}", message_from="debug")
-            
-            if "no changes" in fact_check_response.lower():
-                return response
+            if not attempted_prompts:    
+                bing_prompt = f"I just asked you {prompt} and you said {response}. \n I'm going to do a Bing search to double check that, please turn your response into an appropriate search query."
                 
             else:
-                self.save_chat(fact_check_prompt, fact_check_response)
-                return fact_check_response
+                
+                bing_prompt = f"I just asked you {prompt} and you said {response}. \n I'm going to do a Bing search to double check that, please turn your response into an appropriate search query. \n I tried the following search queries and they did not work: {attempted_prompts}"
+                
+            bing_query = self.query_chat_gpt(prompt = bing_prompt, model = "gpt-3.5-turbo")
+                
+            if self.DEBUG:
+                self.printMessage(f"Bing query: {bing_query}", message_from="debug")
+            
+            bing_results = self.search_bing(bing_query)
+            
+            if not bing_results:
+                attempted_prompts.append(bing_prompt)
+
+        
+        summary = ""
+        num_result = 1
+        
+        for result in bing_results:
+            if num_result <= self.NumFactchecks:
+                if self.DEBUG:
+                    self.printMessage(f"Fact checking result {num_result}: {result}", message_from="debug")
+                    
+                result_information = self.extract_relevant_text(result)
+            
+                if self.DEBUG:
+                    self.printMessage(f"Result information: {result_information} \n \n", message_from="debug")
+            
+                response_words = result_information.split(" ")
+                word_count = len(response_words)
+                
+                if self.DEBUG:
+                    self.printMessage(f"Word count: {word_count}", message_from="debug")
+                
+                # This section breaks up the response into 2000 word chunks, and then summarizes each chunk
+                # This is necessary because GPT-3 has a token limit of 4096, or roughly 3000 words. That includes both the prompt and the response
+                # You can change the 2000 to a lower number if you want to summarize more frequently, but it will take longer
+                # Or change it to a higher number when we have a model that accepts more tokens
+                if word_count > 2000:
+                    while word_count > 2000:
+                        if self.DEBUG:
+                            self.printMessage(f"Word count was too high, splitting up, the section we are summarizing is: {response_words[:2000]}", message_from="debug")
+                        
+                        split_information = response_words[:2000]
+                        response_words = response_words[2000:]
+                        
+                        summarize_prompt = f"We just ran a bing search, and this is what the first search item had in it: {split_information} \n Please summarize the information in the result. Keep all the information, but make it shorter, except code blocks."
+                        summary_response = self.query_chat_gpt(summarize_prompt, model = "gpt-3.5-turbo")
+                        word_count = len(response_words)
+                else:   
+                    summarize_prompt = f"We just ran a bing search, and this is what the first search item had in it: {result_information} \n Please summarize the information in the result. Keep all the information, but make it shorter, except code blocks."
+                    summary_response = self.query_chat_gpt(summarize_prompt, model = "gpt-3.5-turbo")
+                
+                if self.DEBUG:
+                    self.printMessage(f"Summary response from ChatGPT: {summary_response}", message_from="debug")
+                
+                summary = summary + f"\n {summary_response}"
+                
+                num_result += 1
+        
+        if self.DEBUG:
+            self.printMessage(f"Summary: {summary}", message_from="debug")
+        
+        fact_check_prompt = f"I did a Bing search to double check that, here are the results: {summary} \n update your last response, but only if it matters. If it doesn't matter, just say 'no changes'."
+        fact_check_response = self.chat(fact_check_prompt)
+        
+        if self.DEBUG:
+            self.printMessage(f"Fact checked response: {fact_check_response}", message_from="debug")
+        
+        if "no changes" in fact_check_response.lower():
+            return response
+            
+        else:
+            self.save_chat(fact_check_prompt, fact_check_response)
+            return fact_check_response
             
     
     # The prompt for this is not currently returning expected values            
