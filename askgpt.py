@@ -7,6 +7,8 @@ import sqlite3
 import datetime
 from colorama import Fore, Style, init
 from halo import Halo
+import requests
+from bs4 import BeautifulSoup
  
  # Read the API key from the environment variable
 openai.api_key = os.environ["OPENAI_API_KEY"]
@@ -18,8 +20,14 @@ class ChatGPT:
     FileContents = ""
     Chatname = ""
     Model = "gpt-4"
+    BingKey = ""
+    FactCheck = False
+    NumFactchecks = 1
+    DEBUG = False 
     PromptColor = Fore.WHITE
     GPTColor = Fore.GREEN
+    DebugColor = Fore.YELLOW
+    ErrorColor = Fore.RED
     
     def __init__(self, api_key = os.environ["OPENAI_API_KEY"], history_file = history_file, max_tokens=2048, temperature=0.3, frequency_penalty=0.0, stop=None):
         openai.api_key = api_key
@@ -30,6 +38,9 @@ class ChatGPT:
         self.frequency_penalty = frequency_penalty
         self.stop = stop
         
+        self.BingKey = os.environ["BING_SEARCH_API_KEY"]
+
+        
         conn = sqlite3.connect(self.history_file)
         c = conn.cursor()
         c.execute("SELECT chatname FROM chat ORDER BY timestamp DESC LIMIT 1")
@@ -39,6 +50,9 @@ class ChatGPT:
         # Create the chat history database if it doesn't exist
         if not os.path.exists(self.history_file):
             self._init_database()
+            
+        self.printMessage("Welcome to ChatGPT!", message_from="gpt")
+        self.printMessage(f"This version does not have extensive error checking. This will be updated in a future version. \n", message_from="gpt")
 
     def printMessage (self, message, message_from = "prompt"):
         '''
@@ -52,12 +66,18 @@ class ChatGPT:
         if message_from == "gpt":
             color = self.GPTColor
             
+        if message_from == "debug":
+            color = self.DebugColor
+            
+        if message_from == "error":
+            color = self.DebugColor
+            
         try:    
             print(f"{color}{message}{Style.RESET_ALL}")
         except:
             print(f"{message}")
         
-    def chat(self, prompt, model = ""):
+    def chat(self, prompt, model = "", check_bing = False):
         """
         Main function to chat with GPT. You may need to edit the lines under the message to customize how you want ChatGPT
         to respond. The default is to tell ChatGPT it is a Python expert. Obviously, you can change that to whatever you want.
@@ -136,10 +156,72 @@ class ChatGPT:
         # GPT can return more than one message, but we only want the first one. This script only requests a single response.
         # See OpenAI docs for more info on multiple responses
         message = response.choices[0].message.content
+        
         self.LastResponse = message
         self.LastPrompt = prompt
  
         return self.LastResponse
+ 
+    def query_chat_gpt(self, prompt = "", model = ""):
+        
+        if not model:
+            model = self.Model
+            
+        # Send the prompt to GPT
+        # Basic error checking, primarily to catch when GPT-4 is overloaded and switch to GPT-3.5 Turbo
+        response = None
+        try:
+            response = openai.ChatCompletion.create(
+                model = self.Model,
+                messages =  [{"role": "user", "content": prompt}]
+            )
+        except openai.error.APIError as error:
+            # if there is an API error with message exceeded maximum allotted capacity, switch to gpt-3.5-turbo model
+            if error.status == 429 and model == 'gpt-4' :
+                self.printMessage("GPT 4 is unavailable, switching to GPT 3.5 Turbo", message_from="prompt")
+                self.query_chat_gpt(prompt, model = "gpt-3.5-turbo")
+            else:
+                # if it's another kind of error, raise the error
+                raise error
+        
+        # Grab the first message from the response.
+        # GPT can return more than one message, but we only want the first one. This script only requests a single response.
+        # See OpenAI docs for more info on multiple responses
+        message = response.choices[0].message.content
+        
+        return message
+
+    def search_bing(self, query, BingKey = ""):
+        
+        if not BingKey:
+            BingKey = self.BingKey
+        
+        if self.DEBUG:
+            self.printMessage(f"Searching Bing for {query}", message_from="debug")
+        
+        url = f"https://api.bing.microsoft.com/v7.0/search?q={query}"
+        headers = {"Ocp-Apim-Subscription-Key": self.BingKey}
+        response = requests.get(url, headers=headers)
+        results = response.json().get("webPages", {}).get("value", [])
+        urls = [result['url'] for result in results]
+        
+        if self.DEBUG:
+            self.printMessage(results, message_from="debug")
+            self.printMessage(f"Found {len(results)} results", message_from="debug")
+            # self.printMessage(f"First result: {results[0]['url']}", message_from="debug")
+            
+        return urls if urls else None
+
+    def extract_relevant_text(self, url):
+        
+        if self.DEBUG:
+            self.printMessage(f"Extracting relevant text from {url}", message_from="debug")
+        
+        response = requests.get(url)
+        soup = BeautifulSoup(response.content, "html.parser")
+        paragraphs = soup.find_all("p")
+        text = "\n".join([p.text for p in paragraphs])
+        return text
  
     def save_chat(self, prompt, message, chatname = ''):
         """
@@ -234,13 +316,118 @@ class ChatGPT:
                     response = self.chat(prompt)
             except:
                 response = self.chat(prompt)
+            
+            self.save_chat(prompt, response)
+            
+            if self.FactCheck:
+                if self.BingKey == "":
+                    self.printMessage("You need to provide a Bing API key to use fact checking", message_from="error")
+                    
+                else:
+                    try:                
+                        with Halo(text='GPT is fact checking.', spinner='dots'):
+                            fact_check_response = self.fact_check(prompt, response)
+                    except:
+                        fact_check_response = self.fact_check(prompt, response)
+            
+            if fact_check_response == response:                
+                self.printMessage(response, message_from="gpt")
                 
-            self.printMessage(f"{response}\n...\n", message_from="gpt")
+            else:
+                self.printMessage(fact_check_response, message_from="gpt")
+                self.save_chat(f"After running a fact check a better response was {fact_check_response}", "Thank you, I will remember that")
             
             if "---output---" in response:
                 self.printMessage(f"Output: {response.split('---output---')[1]}", message_from="gpt")
+    
+    def fact_check(self, prompt, response):
+        
+        if self.DEBUG:
+            self.printMessage("We got an initial response from GPT, will now check it against Bing", message_from="debug")
+            
+            attempted_prompts = []
+            bing_results = None
+            while bing_results == None or bing_results == "":
                 
-            self.save_chat(prompt, response)
+                if not attempted_prompts:    
+                    bing_prompt = f"I just asked you {prompt} and you said {response}. \n I'm going to do a Bing search to double check that, please turn your response into an appropriate search query."
+                    
+                else:
+                    
+                    bing_prompt = f"I just asked you {prompt} and you said {response}. \n I'm going to do a Bing search to double check that, please turn your response into an appropriate search query. \n I tried the following search queries and they did not work: {attempted_prompts}"
+                    
+                bing_query = self.query_chat_gpt(prompt = bing_prompt, model = "gpt-3.5-turbo")
+                    
+                if self.DEBUG:
+                    self.printMessage(f"Bing query: {bing_query}", message_from="debug")
+                
+                bing_results = self.search_bing(bing_query)
+                
+                if not bing_results:
+                    attempted_prompts.append(bing_prompt)
+
+            
+            summary = ""
+            num_result = 1
+            
+            for result in bing_results:
+                if num_result <= self.NumFactchecks:
+                    if self.DEBUG:
+                        self.printMessage(f"Fact checking result {num_result}: {result}", message_from="debug")
+                        
+                    result_information = self.extract_relevant_text(result)
+                
+                    if self.DEBUG:
+                        self.printMessage(f"Result information: {result_information} \n \n", message_from="debug")
+                
+                    response_words = result_information.split(" ")
+                    word_count = len(response_words)
+                    
+                    if self.DEBUG:
+                        self.printMessage(f"Word count: {word_count}", message_from="debug")
+                    
+                    # This section breaks up the response into 2000 word chunks, and then summarizes each chunk
+                    # This is necessary because GPT-3 has a token limit of 4096, or roughly 3000 words. That includes both the prompt and the response
+                    # You can change the 2000 to a lower number if you want to summarize more frequently, but it will take longer
+                    # Or change it to a higher number when we have a model that accepts more tokens
+                    if word_count > 2000:
+                        while word_count > 2000:
+                            if self.DEBUG:
+                                self.printMessage(f"Word count was too high, splitting up, the section we are summarizing is: {response_words[:2000]}", message_from="debug")
+                            
+                            split_information = response_words[:2000]
+                            response_words = response_words[2000:]
+                            
+                            summarize_prompt = f"We just ran a bing search, and this is what the first search item had in it: {split_information} \n Please summarize the information in the result. Keep all the information, but make it shorter, except code blocks."
+                            summary_response = self.query_chat_gpt(summarize_prompt, model = "gpt-3.5-turbo")
+                            word_count = len(response_words)
+                    else:   
+                        summarize_prompt = f"We just ran a bing search, and this is what the first search item had in it: {result_information} \n Please summarize the information in the result. Keep all the information, but make it shorter, except code blocks."
+                        summary_response = self.query_chat_gpt(summarize_prompt, model = "gpt-3.5-turbo")
+                    
+                    if self.DEBUG:
+                        self.printMessage(f"Summary response from ChatGPT: {summary_response}", message_from="debug")
+                    
+                    summary = summary + f"\n {summary_response}"
+                    
+                    num_result += 1
+            
+            if self.DEBUG:
+                self.printMessage(f"Summary: {summary}", message_from="debug")
+            
+            fact_check_prompt = f"I did a Bing search to double check that, here are the results: {summary} \n update your last response, but only if it matters. If it doesn't matter, just say 'no changes'."
+            fact_check_response = self.chat(fact_check_prompt)
+            
+            if self.DEBUG:
+                self.printMessage(f"Fact checked response: {fact_check_response}", message_from="debug")
+            
+            if "no changes" in fact_check_response.lower():
+                return response
+                
+            else:
+                self.save_chat(fact_check_prompt, fact_check_response)
+                return fact_check_response
+            
     
     # The prompt for this is not currently returning expected values            
     def parse_output(self, output = "", filename = 'output.txt'):
@@ -324,6 +511,27 @@ class ChatGPT:
                     self.Model = user_input.split(" ")[1].strip()
                     self.printMessage(f"Model changed to {self.Model}\n")
                     
+                elif user_input.startswith("/debug on"):
+                    self.DEBUG = True
+                    self.printMessage("Debug mode on")
+                    
+                elif user_input.startswith("/debug off"):
+                    self.DEBUG = True
+                    self.printMessage("Debug mode off")
+                    
+                elif user_input.startswith("/fact check on"):
+                    self.FactCheck = True
+                    num_checks = user_input.replace("/fact check on", "").strip()
+                    
+                    if num_checks:
+                        self.NumFactChecks = int(num_checks)
+                        
+                    self.printMessage(f"Fact check on, will check up to {self.NumFactChecks} Bing results")
+                                        
+                elif user_input.startswith("/fact check off"):
+                    self.FactCheck = False
+                    self.printMessage("Fact check off")
+                    
                 elif user_input.startswith("/list chats"):
                     conn = sqlite3.connect(self.history_file)
                     chat_names = conn.execute("SELECT DISTINCT chatname FROM chat").fetchall()
@@ -344,9 +552,13 @@ class ChatGPT:
                         
                 elif user_input == "exit" or user_input == "quit":
                     exit(0)
-                    
-                user_inputs.append(user_input)
                 
+                # Only add non-commands to the input list
+                else:    
+                    user_inputs.append(user_input)
+                
+            # Insert a new line so it looks cleaner    
+            print("")    
             # Remove the two consecutive empty lines from the user inputs
             user_inputs = user_inputs[:-2]
             
