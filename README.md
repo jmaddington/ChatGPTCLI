@@ -1,3 +1,7 @@
+# ARCHIVED
+
+This is no longer maintained because Simon Willison has such a great tool at https://github.com/simonw/llm
+
 # ASKGPTCLI
 
 A command line interface to ChatGPT, for when you have questions and don't want to switch to Chrome.
